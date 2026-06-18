@@ -1,0 +1,33 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "cb543cb9e3f601a57761b55d8f71067a"
+name = "weebersh"
+application_url = "https://example.com"
+embedded = false
+
+[webhooks]
+api_version = "2024-07"
+
+  [[webhooks.subscriptions]]
+  topics = [ "orders/create", "orders/updated", "checkouts/create", "checkouts/update", "customers/create", "customers/update" ]
+  uri = "https://api.weeber.ai/webhooks/shopify"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
+[webhooks.privacy_compliance]
+customer_data_request_url = "/webhooks/customers/data_request"
+customer_deletion_url = "/webhooks/customers/redact"
+shop_deletion_url = "/webhooks/shop/redact"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_orders,read_customers,read_checkouts,write_script_tags"
+
+[auth]
+redirect_urls = [ "https://example.com/api/auth" ]
+
+[build]
+include_config_on_deploy = true
+automatically_update_urls_on_dev = true
