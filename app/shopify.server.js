@@ -6,6 +6,11 @@ import {
 } from "@shopify/shopify-app-remix/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
+import {
+  fetchMerchantEnrichment,
+  buildConnectedPayload,
+  postToWeeber,
+} from "./weeber.server";
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
@@ -20,23 +25,37 @@ const shopify = shopifyApp({
   hooks: {
     afterAuth: async ({ session, request }) => {
       shopify.registerWebhooks({ session });
-      
+
+      const orgId = request
+        ? new URL(request.url).searchParams.get("org_id")
+        : null;
+
       try {
-        await fetch("https://api.weeber.ai/api/integrations/shopify/connected", {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "X-Weeber-Secret": process.env.WEEBER_INTERNAL_SECRET
-          },
-          body: JSON.stringify({
-            shop: session.shop,
-            access_token: session.accessToken,
-            scopes: session.scope,
-            org_id: request ? new URL(request.url).searchParams.get("org_id") : null
-          }),
+        console.log(`[weeber] afterAuth: enriching merchant data for ${session.shop}`);
+
+        const enrichment = await fetchMerchantEnrichment(
+          session.shop,
+          session.accessToken
+        );
+
+        console.log(`[weeber] afterAuth: enrichment complete for ${session.shop}`, {
+          plan: enrichment.plan_name,
+          products: enrichment.product_count,
+          orders_30d: enrichment.order_count_30d,
+          customers: enrichment.customer_count,
         });
+
+        const payload = buildConnectedPayload(session, enrichment, orgId);
+
+        await postToWeeber("/api/integrations/shopify/connected", payload);
+
+        console.log(`[weeber] afterAuth: successfully notified Weeber for ${session.shop}`);
       } catch (error) {
-        console.error("Failed to notify Weeber of Shopify connection", error);
+        // Never block OAuth completion on enrichment/notification failures
+        console.error(
+          `[weeber] afterAuth: failed to notify Weeber for ${session.shop}`,
+          error
+        );
       }
     },
   },
